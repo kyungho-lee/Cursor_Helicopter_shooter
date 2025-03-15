@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>헬리콥터 슈팅 게임</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+      }
+      canvas {
+        border: 1px solid #333;
+      }
+      #debug-panel {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        padding: 10px;
+        font-family: monospace;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="debug-panel">
+      <div>FPS: <span id="fps">0</span></div>
+      <div>Speed: <span id="speed">0</span></div>
+      <div>Angle: <span id="angle">0</span></div>
+      <div>Engine: <span id="engine">OFF</span></div>
+      <div>Particles: <span id="particles">0</span></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html> 
