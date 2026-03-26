@@ -6,7 +6,6 @@ export class SmokeParticle {
     private size: number;
     private alpha: number;
     private lifetime: number;
-    private initialLifetime: number;
     private velocityX: number;
     private velocityY: number;
 
@@ -16,8 +15,7 @@ export class SmokeParticle {
         this.size = SMOKE.MIN_SIZE + Math.random() * (SMOKE.MAX_SIZE - SMOKE.MIN_SIZE);
         this.alpha = 1.0;
         this.lifetime = lifetime;
-        this.initialLifetime = lifetime;
-        
+
         // 랜덤한 방향으로 이동
         const angle = Math.random() * Math.PI * 2;
         this.velocityX = Math.cos(angle) * SMOKE.SPEED;

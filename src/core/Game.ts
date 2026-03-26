@@ -1,52 +1,80 @@
 import { Player } from '../entities/Player';
-import { InputManager } from './InputManager';
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../utils/Constants';
 
 export class Game {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private isRunning: boolean = false;
   private lastTime: number = 0;
-  private player: Player;
-  private inputManager: InputManager;
+  private player!: Player;
+  private debugPanel: {
+    fps: HTMLElement;
+    speed: HTMLElement;
+    angle: HTMLElement;
+    engine: HTMLElement;
+    particles: HTMLElement;
+  };
 
   constructor() {
     this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
     this.ctx = this.canvas.getContext('2d')!;
-    this.inputManager = InputManager.getInstance();
+    this.debugPanel = {
+      fps: document.getElementById('fps')!,
+      speed: document.getElementById('speed')!,
+      angle: document.getElementById('angle')!,
+      engine: document.getElementById('engine')!,
+      particles: document.getElementById('particles')!,
+    };
     this.init();
   }
 
   private init(): void {
-    // 캔버스 크기 설정
-    this.canvas.width = 800;
-    this.canvas.height = 600;
-
-    // 플레이어 초기화
-    this.player = new Player(
-      this.canvas.width / 2 - 32,
-      this.canvas.height - 100
-    );
+    this.canvas.width = CANVAS_WIDTH;
+    this.canvas.height = CANVAS_HEIGHT;
   }
 
-  public start(): void {
-    if (!this.isRunning) {
-      this.isRunning = true;
-      this.lastTime = performance.now();
-      this.gameLoop();
-    }
+  public async start(): Promise<void> {
+    if (this.isRunning) return;
+
+    await this.loadAssets();
+    this.isRunning = true;
+    this.lastTime = performance.now();
+    this.gameLoop();
+  }
+
+  private async loadAssets(): Promise<void> {
+    const loadImage = (src: string): Promise<HTMLImageElement> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+        img.src = src;
+      });
+    };
+
+    const [helicopterImage, propellerImage] = await Promise.all([
+      loadImage('/assets/helicopter.png'),
+      loadImage('/assets/propeller.png'),
+    ]);
+
+    this.player = new Player(
+      CANVAS_WIDTH / 2 - 25,
+      CANVAS_HEIGHT / 2 - 25,
+      helicopterImage,
+      propellerImage
+    );
   }
 
   private gameLoop(): void {
     if (!this.isRunning) return;
 
     const currentTime = performance.now();
-    const deltaTime = (currentTime - this.lastTime) / 1000; // 초 단위로 변환
+    const deltaTime = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
 
-    // 게임 상태 업데이트
     this.update(deltaTime);
-    // 화면 렌더링
     this.render();
+    this.updateDebugPanel();
 
     requestAnimationFrame(() => this.gameLoop());
   }
@@ -56,11 +84,17 @@ export class Game {
   }
 
   private render(): void {
-    // 화면 클리어
     this.ctx.fillStyle = '#000';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    // 게임 오브젝트 렌더링
-    this.player.render(this.ctx);
+    this.player.draw(this.ctx);
   }
-} 
+
+  private updateDebugPanel(): void {
+    const debug = this.player.getDebugInfo();
+    this.debugPanel.fps.textContent = debug.fps.toString();
+    this.debugPanel.speed.textContent = debug.speed.toString();
+    this.debugPanel.angle.textContent = `${debug.angle}°`;
+    this.debugPanel.engine.textContent = debug.isMoving ? 'ON' : 'OFF';
+    this.debugPanel.particles.textContent = debug.particles.toString();
+  }
+}
