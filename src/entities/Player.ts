@@ -1,9 +1,11 @@
 import { Entity } from './Entity';
 import { Vector2D } from '../utils/Vector2D';
 import { InputManager } from '../core/InputManager';
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../utils/Constants';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, WEAPON } from '../utils/Constants';
 import { PHYSICS, PROPELLER, SMOKE } from '../constants/PhysicsConstants';
 import { SmokeParticle } from './SmokeParticle';
+import { Bullet } from './Bullet';
+import { Missile } from './Missile';
 
 export class Player extends Entity {
   private acceleration: Vector2D = new Vector2D(0, 0);
@@ -18,6 +20,12 @@ export class Player extends Entity {
   // 연기 효과
   private smokeParticles: SmokeParticle[] = [];
   private smokeTimer: number = 0;
+
+  // 무기 시스템
+  private bullets: Bullet[] = [];
+  private missiles: Missile[] = [];
+  private shootCooldown: number = 0;
+  private missileCooldown: number = 0;
 
   // 디버그
   private debug = { speed: 0, angle: 0, isMoving: false };
@@ -64,6 +72,7 @@ export class Player extends Entity {
     this.updatePhysics(deltaTime);
     this.updatePropeller(deltaTime);
     this.updateSmoke(deltaTime);
+    this.updateProjectiles(deltaTime);
     this.clampPosition();
     this.updateDebugInfo();
 
@@ -71,20 +80,16 @@ export class Player extends Entity {
   }
 
   private updatePhysics(deltaTime: number): void {
-    // 마찰력 적용
     this.acceleration.x *= Math.pow(PHYSICS.FRICTION, deltaTime);
     this.acceleration.y *= Math.pow(PHYSICS.FRICTION, deltaTime);
 
-    // 최대 속도 제한
     const currentSpeed = this.velocity.magnitude();
     if (currentSpeed > PHYSICS.MAX_SPEED) {
       this.velocity = this.velocity.normalize().multiply(PHYSICS.MAX_SPEED);
     }
 
-    // 위치 업데이트
     this.position = this.position.add(this.acceleration.multiply(deltaTime));
 
-    // 회전 복원
     if (!this.input.isKeyPressed('ArrowLeft') && !this.input.isKeyPressed('ArrowRight')) {
       const rotationStep = PHYSICS.ROTATION_RETURN_SPEED * deltaTime;
       if (Math.abs(this.rotation) > rotationStep) {
@@ -120,6 +125,24 @@ export class Player extends Entity {
     });
   }
 
+  private updateProjectiles(deltaTime: number): void {
+    // 쿨다운 갱신
+    if (this.shootCooldown > 0) this.shootCooldown -= deltaTime;
+    if (this.missileCooldown > 0) this.missileCooldown -= deltaTime;
+
+    // 총알 업데이트 및 화면 벗어난 것 제거
+    this.bullets = this.bullets.filter(bullet => {
+      bullet.update(deltaTime);
+      return bullet.isActive();
+    });
+
+    // 미사일 업데이트 및 화면 벗어난 것 제거
+    this.missiles = this.missiles.filter(missile => {
+      missile.update(deltaTime);
+      return missile.isActive();
+    });
+  }
+
   private clampPosition(): void {
     this.position.x = Math.max(0, Math.min(CANVAS_WIDTH - this.size.x, this.position.x));
     this.position.y = Math.max(0, Math.min(CANVAS_HEIGHT - this.size.y, this.position.y));
@@ -140,6 +163,7 @@ export class Player extends Entity {
 
   public draw(ctx: CanvasRenderingContext2D): void {
     this.renderSmoke(ctx);
+    this.renderProjectiles(ctx);
 
     ctx.save();
     ctx.translate(
@@ -148,10 +172,7 @@ export class Player extends Entity {
     );
     ctx.rotate(this.rotation);
 
-    // 헬리콥터 본체
     ctx.drawImage(this.image, -this.size.x / 2, -this.size.y / 2);
-
-    // 프로펠러
     this.renderPropeller(ctx);
 
     // 방향 표시
@@ -164,15 +185,13 @@ export class Player extends Entity {
     // 엔진 효과
     if (this.isEngineOn) {
       ctx.fillStyle = '#ff6600';
-      ctx.fillRect(
-        -this.size.x / 2 - 10,
-        -this.size.y / 4,
-        10,
-        this.size.y / 2
-      );
+      ctx.fillRect(-this.size.x / 2 - 10, -this.size.y / 4, 10, this.size.y / 2);
     }
 
     ctx.restore();
+
+    // 미사일 쿨다운 HUD
+    this.renderWeaponHUD(ctx);
   }
 
   private renderPropeller(ctx: CanvasRenderingContext2D): void {
@@ -191,12 +210,59 @@ export class Player extends Entity {
     }
   }
 
+  private renderProjectiles(ctx: CanvasRenderingContext2D): void {
+    for (const bullet of this.bullets) bullet.draw(ctx);
+    for (const missile of this.missiles) missile.draw(ctx);
+  }
+
+  private renderWeaponHUD(ctx: CanvasRenderingContext2D): void {
+    const x = 10;
+    const y = CANVAS_HEIGHT - 30;
+
+    // 미사일 쿨다운 바
+    const missileReady = this.missileCooldown <= 0;
+    const progress = missileReady ? 1 : 1 - this.missileCooldown / WEAPON.MISSILE_COOLDOWN;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(x, y, 100, 12);
+
+    ctx.fillStyle = missileReady ? '#00ff88' : '#ff8800';
+    ctx.fillRect(x, y, 100 * progress, 12);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '10px monospace';
+    ctx.fillText(`MSL: ${missileReady ? 'READY' : `${this.missileCooldown.toFixed(1)}s`}`, x + 2, y + 10);
+  }
+
   public shoot(): void {
-    // TODO: 총알 발사 로직
+    if (this.shootCooldown > 0) return;
+
+    this.shootCooldown = WEAPON.BULLET_COOLDOWN;
+    // 헬리콥터 오른쪽 끝 중앙에서 발사
+    this.bullets.push(new Bullet(
+      this.position.x + this.size.x,
+      this.position.y + this.size.y / 2
+    ));
   }
 
   public launchMissile(): void {
-    // TODO: 미사일 발사 로직
+    if (this.missileCooldown > 0) return;
+
+    this.missileCooldown = WEAPON.MISSILE_COOLDOWN;
+    // 헬리콥터 오른쪽 하단에서 발사
+    this.missiles.push(new Missile(
+      this.position.x + this.size.x,
+      this.position.y + this.size.y * 0.75
+    ));
+  }
+
+  // v0.5.0 충돌 처리를 위한 getter
+  public getBullets(): Bullet[] {
+    return this.bullets;
+  }
+
+  public getMissiles(): Missile[] {
+    return this.missiles;
   }
 
   public getDebugInfo(): {

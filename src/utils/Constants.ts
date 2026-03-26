@@ -21,6 +21,11 @@ export const MISSILE = {
   TURN_SPEED: 0.1
 };
 
+export const WEAPON = {
+  BULLET_COOLDOWN: 0.15,  // 초 (연사 간격)
+  MISSILE_COOLDOWN: 2.0,  // 초 (미사일 재장전)
+};
+
 export const ENEMY = {
   TANK: {
     WIDTH: 48,
